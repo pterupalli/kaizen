@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaizen Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --yin: #232946;
+    --yang: #d98a45;
+    --ink: #22262f;
+    --muted: #656d7a;
+    --line: rgba(34,38,47,0.10);
+    --glass: rgba(255,255,255,0.60);
+    --glass-strong: rgba(255,255,255,0.82);
+    --glass-border: rgba(255,255,255,0.65);
+    --serif: 'Fraunces', serif;
+    --sans: 'Inter', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;color:var(--ink);font-family:var(--sans);width:100%;min-height:100vh;}
+  body{
+    background:
+      radial-gradient(circle at 12% 15%, rgba(35,41,70,0.55) 0%, transparent 42%),
+      radial-gradient(circle at 88% 82%, rgba(217,138,69,0.45) 0%, transparent 48%),
+      linear-gradient(160deg, #eef0f4 0%, #f6f1e8 100%);
+    background-attachment:fixed;
+  }
+  ::selection{background:rgba(217,138,69,0.35);color:var(--ink);}
+
+  .frame{width:100%;max-width:1600px;margin:0 auto;padding:32px 40px 80px;}
+  @media (max-width:640px){.frame{padding:20px 16px 60px;}}
+
+  /* Header */
+  header{
+    display:flex;justify-content:space-between;align-items:center;
+    gap:16px;margin-bottom:24px;flex-wrap:wrap;
+    padding-bottom:18px;border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .yinyang{flex-shrink:0;transition:transform .6s ease;}
+  .yinyang:hover{transform:rotate(180deg);}
+  .brand-text .tag{font-size:12.5px;color:var(--muted);}
+  .brand-text h1{margin:2px 0 2px;font-family:var(--serif);font-size:29px;font-weight:600;letter-spacing:-.01em;color:var(--ink);}
+  .brand-text .sub{color:var(--muted);font-size:13px;}
+  .clock{
+    font-family:var(--mono);text-align:right;color:var(--muted);font-size:12px;line-height:1.6;
+    background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;
+    box-shadow:0 4px 16px rgba(35,41,70,0.06);
+  }
+  .clock span{color:var(--ink);font-weight:500;}
+
+  /* Tabs */
+  nav.tabs{
+    display:flex;gap:6px;margin-bottom:24px;overflow-x:auto;
+    background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--glass-border);border-radius:14px;padding:6px;width:fit-content;max-width:100%;
+  }
+  nav.tabs button{
+    font-family:var(--sans);font-size:13.5px;font-weight:500;
+    background:none;border:none;color:var(--muted);padding:9px 16px;cursor:pointer;
+    border-radius:9px;white-space:nowrap;transition:background .15s ease,color .15s ease;
+  }
+  nav.tabs button.active{color:#fff;background:linear-gradient(120deg,var(--yin),var(--yang));}
+  nav.tabs button:not(.active):hover{color:var(--ink);background:rgba(255,255,255,0.5);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .layout{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
+  .main-col{min-width:0;}
+  .sidebar-chat{position:sticky;top:20px;height:80vh;min-width:0;}
+  .sidebar-chat .panel{height:100%;margin-bottom:0;overflow:hidden;padding-bottom:22px;}
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;}
+    .sidebar-chat{position:static;height:480px;}
+  }
+
+  /* Glass panel */
+  .panel{
+    position:relative;
+    background:var(--glass);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);
+    border:1px solid var(--glass-border);border-radius:18px;
+    padding:20px 22px;margin-bottom:16px;
+    box-shadow:0 10px 34px rgba(35,41,70,0.09), inset 0 1px 0 rgba(255,255,255,0.55);
+  }
+  .panel h2{
+    font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);
+    margin:0 0 14px;
+  }
+  .panel h2 .count{color:var(--muted);font-weight:400;font-family:var(--sans);font-size:13px;margin-left:6px;}
+
+  /* Dashboard grid */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:16px;}
+  .stat{
+    background:var(--glass);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);
+    border:1px solid var(--glass-border);border-radius:16px;padding:18px 18px 16px;position:relative;overflow:hidden;
+    box-shadow:0 10px 30px rgba(35,41,70,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--yin),var(--yang));opacity:.55;}
+  .stat:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(35,41,70,0.12), inset 0 1px 0 rgba(255,255,255,0.5);}
+  .stat .label{font-size:12px;color:var(--muted);letter-spacing:.01em;}
+  .stat .value{font-family:var(--serif);font-size:32px;font-weight:600;margin-top:6px;color:var(--ink);}
+  .stat .value.cyan{color:var(--yin);}
+  .stat .value.red{color:var(--yang);}
+  .stat .value.amber{color:var(--yang);}
+  .stat .sub{font-size:12px;color:var(--muted);margin-top:4px;}
+
+  .two-col{display:grid;grid-template-columns:1.3fr 1fr;gap:16px;}
+  @media (max-width:760px){.two-col{grid-template-columns:1fr;}}
+
+  /* progress bar */
+  .bar-track{background:rgba(34,38,47,0.08);height:9px;border-radius:6px;overflow:hidden;margin-top:6px;box-shadow:inset 0 1px 2px rgba(34,38,47,0.1);}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--yin),var(--yang));border-radius:6px;transition:width .3s ease;}
+  .bar-fill.red{background:linear-gradient(90deg,var(--yin),var(--yang));}
+  .bar-fill.amber{background:linear-gradient(90deg,var(--yin),var(--yang));}
+
+  /* forms */
+  .row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  input,select{
+    background:rgba(255,255,255,0.55);border:1px solid var(--glass-border);color:var(--ink);
+    padding:9px 11px;font-family:var(--sans);font-size:13.5px;border-radius:9px;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:box-shadow .15s ease, border-color .15s ease;
+  }
+  input::placeholder{color:var(--muted);}
+  input:focus,select:focus{outline:none;border-color:var(--yang);box-shadow:0 0 0 3px rgba(217,138,69,0.16);}
+  input[type=text]{flex:1;min-width:140px;}
+  button.btn{
+    font-family:var(--sans);font-size:13px;font-weight:500;
+    background:linear-gradient(120deg,var(--yin),var(--yang));color:#fff;border:none;
+    padding:9px 16px;cursor:pointer;border-radius:9px;
+    box-shadow:0 4px 14px rgba(35,41,70,0.18);
+    transition:transform .12s ease, filter .15s ease, box-shadow .15s ease;
+  }
+  button.btn:hover{filter:brightness(1.08);box-shadow:0 6px 18px rgba(35,41,70,0.22);}
+  button.btn:active{transform:scale(0.97);}
+  button.btn.ghost{background:rgba(255,255,255,0.5);color:var(--muted);border:1px solid var(--glass-border);box-shadow:none;}
+  button.btn.ghost:hover{color:var(--ink);}
+  button.icon-btn{
+    background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 6px;
+    transition:color .15s ease, transform .15s ease;
+  }
+  button.icon-btn:hover{color:var(--yang);transform:scale(1.1);}
+
+  /* list items */
+  ul.items{list-style:none;margin:0;padding:0;}
+  ul.items li{
+    display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--line);
+    border-radius:8px;transition:background .15s ease;
+  }
+  ul.items li:hover{background:rgba(255,255,255,0.35);}
+  ul.items li:last-child{border-bottom:none;}
+  ul.items li .main{flex:1;min-width:0;}
+  ul.items li .name{font-size:14px;}
+  ul.items li .meta{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  ul.items li.done .name{color:var(--muted);text-decoration:line-through;}
+  input[type=checkbox]{width:16px;height:16px;accent-color:var(--yang);flex-shrink:0;cursor:pointer;}
+
+  .skill-row{display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--line);border-radius:8px;transition:background .15s ease;}
+  .skill-row:hover{background:rgba(255,255,255,0.35);}
+  .skill-row:last-child{border-bottom:none;}
+  .skill-row .name{width:150px;flex-shrink:0;font-size:13.5px;}
+  .skill-row .track{flex:1;}
+  .skill-row .pct{font-family:var(--mono);font-size:11px;color:var(--muted);width:34px;text-align:right;}
+  .skill-row input[type=range]{width:100%;accent-color:var(--yang);}
+
+  .empty{
+    color:var(--muted);font-size:13px;padding:18px 12px;text-align:center;
+    border:1px dashed var(--glass-border);border-radius:12px;background:rgba(255,255,255,0.25);
+  }
+
+  .guide{font-size:14.5px;line-height:1.7;color:var(--ink);}
+  .guide h3{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--ink);margin:18px 0 6px;}
+  .guide h3:first-child{margin-top:0;}
+  .guide p{margin:0 0 10px;color:#3a3f4a;}
+  .guide ul{margin:0 0 4px;padding-left:18px;}
+  .guide li{margin-bottom:4px;}
+
+  .job-card{
+    background:rgba(255,255,255,0.5);border:1px solid var(--glass-border);border-radius:14px;
+    padding:14px 16px;margin-bottom:10px;transition:box-shadow .18s ease, transform .18s ease;
+  }
+  .job-card:hover{box-shadow:0 8px 22px rgba(35,41,70,0.08);transform:translateY(-1px);}
+  .job-card .job-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .job-card .job-title{font-family:var(--serif);font-weight:600;font-size:15px;}
+  .req-list{padding-left:0;list-style:none;margin:0;}
+  .req-list li{display:flex;gap:8px;align-items:center;font-size:13px;padding:4px 0;}
+
+  footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:30px;}
+
+  /* thin scrollbars for glass panels */
+  #chatLog::-webkit-scrollbar, .frame ::-webkit-scrollbar{width:6px;}
+  #chatLog::-webkit-scrollbar-thumb, .frame ::-webkit-scrollbar-thumb{background:rgba(35,41,70,0.2);border-radius:6px;}
+
+  /* tab switch fade */
+  .view.active{animation:viewFade .25s ease;}
+  @keyframes viewFade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+</style>
+</head>
+<body>
+
+<div id="authOverlay" style="min-height:100vh;display:none;align-items:center;justify-content:center;padding:20px;">
+  <div class="panel" style="max-width:340px;width:100%;">
+    <h2>Sign in</h2>
+    <div class="row" style="flex-direction:column;">
+      <input type="email" id="authEmail" placeholder="you@example.com" style="width:100%;">
+      <input type="password" id="authPassword" placeholder="Password" style="width:100%;">
+    </div>
+    <div id="authError" style="color:#a8402f;font-size:12.5px;margin-bottom:10px;"></div>
+    <div class="row">
+      <button class="btn" onclick="signIn()">Sign in</button>
+      <button class="btn ghost" onclick="signUp()">Create account</button>
+    </div>
+    <div style="color:var(--muted);font-size:12px;margin-top:8px;">Your data is private to this account.</div>
+  </div>
+</div>
+
+<div class="frame" id="appContent" style="display:none;">
+
+  <header>
+    <div class="brand">
+      <svg class="yinyang" width="42" height="42" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r="48" fill="var(--yin)"/>
+        <path d="M50 2 A48 48 0 0 1 50 98 A24 24 0 0 1 50 50 A24 24 0 0 0 50 2 Z" fill="var(--yang)"/>
+        <circle cx="50" cy="26" r="7" fill="var(--yin)"/>
+        <circle cx="50" cy="74" r="7" fill="var(--yang)"/>
+      </svg>
+      <div class="brand-text">
+        <div class="tag">A quiet place to track progress</div>
+        <h1>Kaizen Dashboard</h1>
+        <div class="sub">IT growth, the Japan plan, and career moves, in one place</div>
+      </div>
+    </div>
+    <div class="clock">
+      <div id="clockDate">—</div>
+      <div><span id="clockTime">—</span></div>
+      <div style="margin-top:6px;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+        <span id="userEmail" style="font-size:11px;"></span>
+        <button class="icon-btn" onclick="signOutUser()" title="Sign out"><span style="font-size:11px;">Sign out</span></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+  <div class="main-col">
+
+  <nav class="tabs">
+    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="itradar">IT radar</button>
+    <button data-view="japan">Japan mission</button>
+    <button data-view="career">Career ops</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="view active">
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="label">Skills tracked</div>
+        <div class="value cyan" id="statSkillCount">0</div>
+        <div class="sub" id="statSkillAvg">avg proficiency —</div>
+      </div>
+      <div class="stat">
+        <div class="label">Certs in progress</div>
+        <div class="value" id="statCertCount">0</div>
+        <div class="sub" id="statCertNext">next: —</div>
+      </div>
+      <div class="stat">
+        <div class="label">Japan fund</div>
+        <div class="value amber" id="statFundPct">0%</div>
+        <div class="sub" id="statFundSub">of savings goal</div>
+      </div>
+      <div class="stat">
+        <div class="label">JLPT target</div>
+        <div class="value red" id="statJlpt">—</div>
+        <div class="sub" id="statJlptSub">current focus level</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Today's suggestion</h2>
+      <div class="guide" id="suggestionBox">
+        <p style="color:var(--muted);font-style:italic;">No suggestion generated yet — this fills in once the daily AI check-in is wired up.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Mission brief</h2>
+      <div class="guide">
+        <p>This is your one screen for "am I moving forward." Log skills and update-log items as you learn them, keep the Japan fund and language tracker current, and check off career actions as you land them. Your data is saved to your account and follows you across devices.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- IT RADAR -->
+  <section id="itradar" class="view">
+    <div class="two-col">
+      <div class="panel">
+        <h2>Core skills <span class="count" id="skillCountLabel"></span></h2>
+        <div class="row">
+          <input type="text" id="skillName" placeholder="Skill or technology (e.g. PowerShell, Azure AD)">
+          <button class="btn" onclick="addSkill()">Add</button>
+        </div>
+        <div id="skillList"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Certifications <span class="count" id="certCountLabel"></span></h2>
+        <div class="row">
+          <input type="text" id="certName" placeholder="Cert name (e.g. AZ-104)">
+          <select id="certStatus">
+            <option value="planned">Planned</option>
+            <option value="studying">Studying</option>
+            <option value="scheduled">Exam scheduled</option>
+            <option value="done">Passed</option>
+          </select>
+          <button class="btn" onclick="addCert()">Add</button>
+        </div>
+        <ul class="items" id="certList"></ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Update log <span class="count" id="updateCountLabel"></span></h2>
+      <div class="row">
+        <input type="text" id="updateText" placeholder="Something to read/watch/try (e.g. 'Read Copilot for M365 admin changelog')">
+        <button class="btn" onclick="addUpdate()">Log</button>
+      </div>
+      <ul class="items" id="updateList"></ul>
+    </div>
+  </section>
+
+  <!-- JAPAN MISSION -->
+  <section id="japan" class="view">
+    <div class="panel">
+      <h2>Relocation fund</h2>
+      <div class="row">
+        <input type="number" id="fundGoal" placeholder="Goal amount (AED)" style="width:160px;">
+        <input type="number" id="fundCurrent" placeholder="Currently saved (AED)" style="width:160px;">
+        <input type="number" id="fundMonthly" placeholder="Monthly contribution (AED)" style="width:180px;">
+        <button class="btn" onclick="saveFund()">Save</button>
+      </div>
+      <div class="bar-track"><div class="bar-fill amber" id="fundBar" style="width:0%"></div></div>
+      <div class="sub" id="fundSummary" style="margin-top:8px;color:var(--muted);font-size:12.5px;">Set your numbers above to see the countdown.</div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <h2>Language tracker</h2>
+        <div class="row">
+          <select id="jlptCurrent">
+            <option value="">No level yet</option>
+            <option value="N5">N5</option>
+            <option value="N4">N4</option>
+            <option value="N3">N3</option>
+            <option value="N2">N2</option>
+            <option value="N1">N1</option>
+          </select>
+          <select id="jlptTarget">
+            <option value="">Target level</option>
+            <option value="N5">N5</option>
+            <option value="N4">N4</option>
+            <option value="N3">N3</option>
+            <option value="N2">N2</option>
+            <option value="N1">N1</option>
+          </select>
+          <button class="btn" onclick="saveJlpt()">Save</button>
+        </div>
+        <div class="sub" id="jlptSummary" style="color:var(--muted);font-size:12.5px;margin-bottom:14px;">Most tech roles in Japan want at least N3–N2.</div>
+        <div class="row">
+          <input type="text" id="studyNote" placeholder="Study log note (e.g. 'Finished Genki 1 ch.5')">
+          <button class="btn" onclick="addStudyNote()">Log</button>
+        </div>
+        <ul class="items" id="studyList"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>Target jobs & requirements</h2>
+        <div class="row">
+          <input type="text" id="jobTitle" placeholder="Job title (e.g. Infrastructure Engineer)">
+          <button class="btn" onclick="addJob()">Add role</button>
+        </div>
+        <div id="jobList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAREER OPS -->
+  <section id="career" class="view">
+    <div class="two-col">
+      <div class="panel">
+        <h2>Action list</h2>
+        <div class="row">
+          <input type="text" id="careerTask" placeholder="Action to land (e.g. 'Present CSP proposal')">
+          <button class="btn" onclick="addCareerTask()">Add</button>
+        </div>
+        <ul class="items" id="careerList"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>Guide — excelling where you are</h2>
+        <div class="guide">
+          <h3>Make your work visible</h3>
+          <p>Sysadmin work is invisible when it goes well. Keep a running log of what you fixed, automated, or hardened, with rough time saved or risk removed. Bring it to your Operations Director in plain business terms, not ticket counts.</p>
+
+          <h3>Sequence your proposals</h3>
+          <p>You're already doing this right — leading with the license cleanup before the CSP switch. Keep stacking wins in that order: quick, low-risk, measurable first; bigger asks once you've built trust.</p>
+
+          <h3>Turn breadth into depth on paper</h3>
+          <p>You're deliberately building breadth (M365, Exchange, Google Workspace, networking, Odoo, AWS). Certifications are how that breadth becomes legible to an outside recruiter — keep the MS-900 → MS-102 → Network+ → AZ-104 sequence moving even at 30 minutes a day.</p>
+
+          <h3>Document as you go</h3>
+          <p>Every migration, proposal, and fix is future interview material and future Japan-job evidence. Write a short one-paragraph case study for each meaningful project while it's fresh.</p>
+
+          <h3>Build outward relationships</h3>
+          <p>Vendors, external partners (like Fidobe on Odoo), and your Operations Director are your best references later. Treat every cross-team project as a chance to be the person people vouch for.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+  <aside class="sidebar-chat">
+    <div class="panel" style="display:flex;flex-direction:column;height:100%;">
+      <h2>April</h2>
+      <div style="color:var(--muted);font-size:12.5px;margin-bottom:12px;">Tell it what changed — "I finished Genki chapter 6", "add 500 AED to my Japan fund", "mark AZ-104 as studying" — and it updates the right tracker. It can also just answer questions or teach.</div>
+      <div id="chatLog" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-bottom:14px;padding-right:4px;"></div>
+      <div class="row" style="margin-bottom:0;margin-top:2px;padding-top:10px;border-top:1px solid var(--line);flex-shrink:0;">
+        <input type="text" id="chatInput" placeholder="Talk to April..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+        <button class="btn" onclick="sendChatMessage()">Send</button>
+      </div>
+    </div>
+  </aside>
+
+  </div>
+
+  <footer>Signed in and synced to your account</footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyDDo7IUfxUP2Mi1OYy1hlelD4wloU8uSwg",
+  authDomain: "kaizen-dashboard-8c949.firebaseapp.com",
+  projectId: "kaizen-dashboard-8c949",
+  storageBucket: "kaizen-dashboard-8c949.firebasestorage.app",
+  messagingSenderId: "630374340667",
+  appId: "1:630374340667:web:d312b47abc73ee2017641e"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser = null;
+const saveTimers = {};
+
+function userDocRef(){ return db.collection('users').doc(currentUser.uid); }
+
+const store = {
+  set(key, val){
+    if(!currentUser) return;
+    clearTimeout(saveTimers[key]);
+    saveTimers[key] = setTimeout(()=>{
+      userDocRef().set({ [key]: val }, { merge:true }).catch(e=>console.error('save failed', e));
+    }, 350);
+  }
+};
+
+function signIn(){
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPassword').value;
+  document.getElementById('authError').textContent = '';
+  auth.signInWithEmailAndPassword(email, pass).catch(e=>{ document.getElementById('authError').textContent = e.message; });
+}
+function signUp(){
+  const email = document.getElementById('authEmail').value.trim();
+  const pass = document.getElementById('authPassword').value;
+  document.getElementById('authError').textContent = '';
+  auth.createUserWithEmailAndPassword(email, pass).catch(e=>{ document.getElementById('authError').textContent = e.message; });
+}
+function signOutUser(){ auth.signOut(); }
+
+async function loadUserData(){
+  const snap = await userDocRef().get();
+  const data = snap.exists ? snap.data() : {};
+  skills = data.skills || [];
+  certs = data.certs || [];
+  updates = data.updates || [];
+  fund = data.fund || {goal:null, current:null, monthly:null};
+  jlpt = data.jlpt || {current:'', target:''};
+  studyLog = data.studyLog || [];
+  jobs = data.jobs || [];
+  careerTasks = data.careerTasks || [];
+  suggestion = data.suggestion || null;
+  renderSkills(); renderCerts(); renderUpdates(); renderFund(); renderJlpt(); renderStudyLog(); renderJobs(); renderCareer(); renderSuggestion();
+}
+
+function renderSuggestion(){
+  const box = document.getElementById('suggestionBox');
+  if(!suggestion || !suggestion.text){
+    box.innerHTML = '<p style="color:var(--muted);font-style:italic;">No suggestion generated yet — this fills in once the daily AI check-in is wired up.</p>';
+    return;
+  }
+  box.innerHTML = `<p style="color:var(--muted);font-size:12px;margin-bottom:6px;">${escapeHtml(suggestion.date||'')}</p><p>${escapeHtml(suggestion.text)}</p>`;
+}
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    currentUser = user;
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('appContent').style.display = 'block';
+    setTimeout(sizeSidebar, 50);
+    document.getElementById('userEmail').textContent = user.email;
+    loadUserData();
+  } else {
+    currentUser = null;
+    document.getElementById('authOverlay').style.display = 'flex';
+    document.getElementById('appContent').style.display = 'none';
+  }
+});
+
+// ---------- Assistant chat ----------
+// Set this once the Cloud Function is deployed (Step 4 — see chat).
+const CHAT_ENDPOINT = '';
+
+function addChatBubble(role, text){
+  const log = document.getElementById('chatLog');
+  const bubble = document.createElement('div');
+  bubble.style.cssText = role==='user'
+    ? 'align-self:flex-end;background:linear-gradient(120deg,var(--yin),var(--yang));color:#fff;padding:10px 14px;border-radius:14px 14px 2px 14px;max-width:80%;font-size:14px;'
+    : 'align-self:flex-start;background:rgba(255,255,255,0.6);border:1px solid var(--glass-border);padding:10px 14px;border-radius:14px 14px 14px 2px;max-width:80%;font-size:14px;';
+  bubble.textContent = text;
+  log.appendChild(bubble);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function sendChatMessage(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+  addChatBubble('user', text);
+  input.value = '';
+
+  if(!CHAT_ENDPOINT){
+    addChatBubble('assistant', "I'm not connected to my backend yet — once the Cloud Function is deployed I'll be able to update your trackers and answer questions directly from here.");
+    return;
+  }
+  try{
+    const idToken = await currentUser.getIdToken();
+    const res = await fetch(CHAT_ENDPOINT, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    addChatBubble('assistant', data.reply || "Got it.");
+    if(data.updated) loadUserData();
+  }catch(e){
+    addChatBubble('assistant', "Couldn't reach the assistant just now — try again in a moment.");
+  }
+}
+
+// ---------- Tabs ----------
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.view).classList.add('active');
+  });
+});
+
+// ---------- Clock ----------
+function tickClock(){
+  const now = new Date();
+  document.getElementById('clockDate').textContent = now.toLocaleDateString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+  document.getElementById('clockTime').textContent = now.toLocaleTimeString();
+}
+tickClock(); setInterval(tickClock,1000);
+
+// ---------- Fit April's panel to the visible screen ----------
+function sizeSidebar(){
+  const aside = document.querySelector('.sidebar-chat');
+  if(!aside || window.innerWidth <= 900) { if(aside) aside.style.height=''; return; }
+  const top = aside.getBoundingClientRect().top;
+  const available = window.innerHeight - top - 20;
+  aside.style.height = Math.max(320, available) + 'px';
+}
+window.addEventListener('resize', sizeSidebar);
+window.addEventListener('load', sizeSidebar);
+setTimeout(sizeSidebar, 50);
+
+// ---------- Skills ----------
+let skills = [];
+function renderSkills(){
+  const wrap = document.getElementById('skillList');
+  document.getElementById('skillCountLabel').textContent = '('+skills.length+')';
+  if(!skills.length){ wrap.innerHTML = '<div class="empty">No skills tracked yet.</div>'; updateDashboard(); return; }
+  wrap.innerHTML = skills.map((s,i)=>`
+    <div class="skill-row">
+      <div class="name">${escapeHtml(s.name)}</div>
+      <div class="track"><input type="range" min="0" max="100" value="${s.level}" oninput="updateSkillLevel(${i}, this.value)"></div>
+      <div class="pct">${s.level}%</div>
+      <button class="icon-btn" onclick="removeSkill(${i})">✕</button>
+    </div>`).join('');
+  updateDashboard();
+}
+function addSkill(){
+  const input = document.getElementById('skillName');
+  const name = input.value.trim();
+  if(!name) return;
+  skills.push({name, level:20});
+  store.set('skills', skills);
+  input.value='';
+  renderSkills();
+}
+function updateSkillLevel(i, val){
+  skills[i].level = parseInt(val);
+  store.set('skills', skills);
+  document.querySelectorAll('.skill-row .pct')[i].textContent = val+'%';
+  updateDashboard();
+}
+function removeSkill(i){ skills.splice(i,1); store.set('skills', skills); renderSkills(); }
+
+// ---------- Certs ----------
+let certs = [];
+const certLabels = {planned:'Planned', studying:'Studying', scheduled:'Exam scheduled', done:'Passed'};
+function renderCerts(){
+  const wrap = document.getElementById('certList');
+  document.getElementById('certCountLabel').textContent = '('+certs.length+')';
+  if(!certs.length){ wrap.innerHTML = '<li class="empty">No certifications tracked yet.</li>'; updateDashboard(); return; }
+  wrap.innerHTML = certs.map((c,i)=>`
+    <li class="${c.status==='done'?'done':''}">
+      <div class="main">
+        <div class="name">${escapeHtml(c.name)}</div>
+        <div class="meta">${certLabels[c.status]||c.status}</div>
+      </div>
+      <select onchange="updateCertStatus(${i}, this.value)">
+        ${Object.entries(certLabels).map(([k,v])=>`<option value="${k}" ${c.status===k?'selected':''}>${v}</option>`).join('')}
+      </select>
+      <button class="icon-btn" onclick="removeCert(${i})">✕</button>
+    </li>`).join('');
+  updateDashboard();
+}
+function addCert(){
+  const input = document.getElementById('certName');
+  const status = document.getElementById('certStatus').value;
+  const name = input.value.trim();
+  if(!name) return;
+  certs.push({name, status});
+  store.set('certs', certs);
+  input.value='';
+  renderCerts();
+}
+function updateCertStatus(i, val){ certs[i].status = val; store.set('certs', certs); renderCerts(); }
+function removeCert(i){ certs.splice(i,1); store.set('certs', certs); renderCerts(); }
+
+// ---------- Update log ----------
+let updates = [];
+function renderUpdates(){
+  const wrap = document.getElementById('updateList');
+  document.getElementById('updateCountLabel').textContent = '('+updates.length+')';
+  if(!updates.length){ wrap.innerHTML = '<li class="empty">No entries yet — log articles, releases, or things worth learning.</li>'; return; }
+  wrap.innerHTML = updates.slice().reverse().map((u)=>{
+    const i = updates.indexOf(u);
+    return `<li class="${u.done?'done':''}">
+      <input type="checkbox" ${u.done?'checked':''} onchange="toggleUpdate(${i})">
+      <div class="main">
+        <div class="name">${escapeHtml(u.text)}</div>
+        <div class="meta">${u.date}</div>
+      </div>
+      <button class="icon-btn" onclick="removeUpdate(${i})">✕</button>
+    </li>`;
+  }).join('');
+}
+function addUpdate(){
+  const input = document.getElementById('updateText');
+  const text = input.value.trim();
+  if(!text) return;
+  updates.push({text, done:false, date:new Date().toLocaleDateString()});
+  store.set('updates', updates);
+  input.value='';
+  renderUpdates();
+}
+function toggleUpdate(i){ updates[i].done = !updates[i].done; store.set('updates', updates); renderUpdates(); }
+function removeUpdate(i){ updates.splice(i,1); store.set('updates', updates); renderUpdates(); }
+
+// ---------- Japan fund ----------
+let fund = {goal:null, current:null, monthly:null};
+function renderFund(){
+  if(fund.goal) document.getElementById('fundGoal').value = fund.goal;
+  if(fund.current) document.getElementById('fundCurrent').value = fund.current;
+  if(fund.monthly) document.getElementById('fundMonthly').value = fund.monthly;
+  const goal = parseFloat(fund.goal)||0, current = parseFloat(fund.current)||0, monthly = parseFloat(fund.monthly)||0;
+  const pct = goal>0 ? Math.min(100, Math.round((current/goal)*100)) : 0;
+  document.getElementById('fundBar').style.width = pct+'%';
+  document.getElementById('statFundPct').textContent = pct+'%';
+  if(goal>0 && monthly>0 && current<goal){
+    const monthsLeft = Math.ceil((goal-current)/monthly);
+    const target = new Date(); target.setMonth(target.getMonth()+monthsLeft);
+    document.getElementById('fundSummary').textContent = `AED ${current.toLocaleString()} of ${goal.toLocaleString()} saved · at AED ${monthly.toLocaleString()}/mo, goal reached in ~${monthsLeft} months (around ${target.toLocaleDateString(undefined,{month:'short', year:'numeric'})})`;
+    document.getElementById('statFundSub').textContent = `~${monthsLeft} months to go`;
+  } else if(goal>0){
+    document.getElementById('fundSummary').textContent = `AED ${current.toLocaleString()} of ${goal.toLocaleString()} saved.`;
+    document.getElementById('statFundSub').textContent = 'add a monthly amount for a timeline';
+  } else {
+    document.getElementById('fundSummary').textContent = 'Set your numbers above to see the countdown.';
+    document.getElementById('statFundSub').textContent = 'of savings goal';
+  }
+}
+function saveFund(){
+  fund = {
+    goal: document.getElementById('fundGoal').value,
+    current: document.getElementById('fundCurrent').value,
+    monthly: document.getElementById('fundMonthly').value
+  };
+  store.set('fund', fund);
+  renderFund();
+}
+
+// ---------- JLPT ----------
+let jlpt = {current:'', target:''};
+function renderJlpt(){
+  document.getElementById('jlptCurrent').value = jlpt.current;
+  document.getElementById('jlptTarget').value = jlpt.target;
+  document.getElementById('statJlpt').textContent = jlpt.current || '—';
+  document.getElementById('jlptSummary').textContent = jlpt.target
+    ? `Currently ${jlpt.current||'unranked'}, aiming for ${jlpt.target}. Most tech roles in Japan want at least N3–N2.`
+    : 'Most tech roles in Japan want at least N3–N2.';
+  document.getElementById('statJlptSub').textContent = jlpt.target ? `target: ${jlpt.target}` : 'current focus level';
+}
+function saveJlpt(){
+  jlpt = { current: document.getElementById('jlptCurrent').value, target: document.getElementById('jlptTarget').value };
+  store.set('jlpt', jlpt);
+  renderJlpt();
+}
+
+let studyLog = [];
+function renderStudyLog(){
+  const wrap = document.getElementById('studyList');
+  if(!studyLog.length){ wrap.innerHTML = '<li class="empty">No study entries logged yet.</li>'; return; }
+  wrap.innerHTML = studyLog.slice().reverse().map((s)=>{
+    const i = studyLog.indexOf(s);
+    return `<li><div class="main"><div class="name">${escapeHtml(s.text)}</div><div class="meta">${s.date}</div></div><button class="icon-btn" onclick="removeStudyNote(${i})">✕</button></li>`;
+  }).join('');
+}
+function addStudyNote(){
+  const input = document.getElementById('studyNote');
+  const text = input.value.trim();
+  if(!text) return;
+  studyLog.push({text, date:new Date().toLocaleDateString()});
+  store.set('studyLog', studyLog);
+  input.value='';
+  renderStudyLog();
+}
+function removeStudyNote(i){ studyLog.splice(i,1); store.set('studyLog', studyLog); renderStudyLog(); }
+
+// ---------- Target jobs ----------
+let jobs = [];
+function renderJobs(){
+  const wrap = document.getElementById('jobList');
+  if(!jobs.length){ wrap.innerHTML = '<div class="empty">Add a target role to start tracking its requirements.</div>'; return; }
+  wrap.innerHTML = jobs.map((j,ji)=>`
+    <div class="job-card">
+      <div class="job-head">
+        <div class="job-title">${escapeHtml(j.title)}</div>
+        <button class="icon-btn" onclick="removeJob(${ji})">✕</button>
+      </div>
+      <ul class="req-list">
+        ${j.reqs.map((r,ri)=>`<li><input type="checkbox" ${r.done?'checked':''} onchange="toggleReq(${ji},${ri})"><span style="${r.done?'color:var(--muted);text-decoration:line-through;':''}">${escapeHtml(r.text)}</span><button class="icon-btn" style="margin-left:auto;" onclick="removeReq(${ji},${ri})">✕</button></li>`).join('')}
+      </ul>
+      <div class="row" style="margin-top:8px;margin-bottom:0;">
+        <input type="text" placeholder="Add requirement (e.g. 'JLPT N2', 'AWS experience')" id="reqInput${ji}" style="font-size:12.5px;padding:6px 8px;">
+        <button class="btn" style="padding:6px 10px;" onclick="addReq(${ji})">+</button>
+      </div>
+    </div>`).join('');
+}
+function addJob(){
+  const input = document.getElementById('jobTitle');
+  const title = input.value.trim();
+  if(!title) return;
+  jobs.push({title, reqs:[]});
+  store.set('jobs', jobs);
+  input.value='';
+  renderJobs();
+}
+function removeJob(i){ jobs.splice(i,1); store.set('jobs', jobs); renderJobs(); }
+function addReq(ji){
+  const input = document.getElementById('reqInput'+ji);
+  const text = input.value.trim();
+  if(!text) return;
+  jobs[ji].reqs.push({text, done:false});
+  store.set('jobs', jobs);
+  renderJobs();
+}
+function toggleReq(ji,ri){ jobs[ji].reqs[ri].done = !jobs[ji].reqs[ri].done; store.set('jobs', jobs); renderJobs(); }
+function removeReq(ji,ri){ jobs[ji].reqs.splice(ri,1); store.set('jobs', jobs); renderJobs(); }
+
+// ---------- Career actions ----------
+let careerTasks = [];
+function renderCareer(){
+  const wrap = document.getElementById('careerList');
+  if(!careerTasks.length){ wrap.innerHTML = '<li class="empty">No actions listed yet.</li>'; return; }
+  wrap.innerHTML = careerTasks.map((t,i)=>`
+    <li class="${t.done?'done':''}">
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleCareer(${i})">
+      <div class="main"><div class="name">${escapeHtml(t.text)}</div></div>
+      <button class="icon-btn" onclick="removeCareer(${i})">✕</button>
+    </li>`).join('');
+}
+function addCareerTask(){
+  const input = document.getElementById('careerTask');
+  const text = input.value.trim();
+  if(!text) return;
+  careerTasks.push({text, done:false});
+  store.set('careerTasks', careerTasks);
+  input.value='';
+  renderCareer();
+}
+function toggleCareer(i){ careerTasks[i].done = !careerTasks[i].done; store.set('careerTasks', careerTasks); renderCareer(); }
+function removeCareer(i){ careerTasks.splice(i,1); store.set('careerTasks', careerTasks); renderCareer(); }
+
+// ---------- Dashboard aggregation ----------
+function updateDashboard(){
+  document.getElementById('statSkillCount').textContent = skills.length;
+  document.getElementById('statSkillAvg').textContent = skills.length
+    ? 'avg proficiency ' + Math.round(skills.reduce((a,s)=>a+s.level,0)/skills.length) + '%'
+    : 'avg proficiency —';
+  const inProgress = certs.filter(c=>c.status!=='done');
+  document.getElementById('statCertCount').textContent = inProgress.length;
+  document.getElementById('statCertNext').textContent = 'next: ' + (inProgress[0] ? inProgress[0].name : '—');
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+// ---------- Init (runs after login, see loadUserData) ----------
+let suggestion = null;
+</script>
+</body>
+</html>
