@@ -241,6 +241,7 @@
       <div id="clockDate">—</div>
       <div><span id="clockTime">—</span></div>
       <div style="margin-top:6px;display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+        <span id="syncStatus" style="font-size:10.5px;min-width:40px;"></span>
         <span id="userEmail" style="font-size:11px;"></span>
         <button class="icon-btn" onclick="signOutUser()" title="Sign out"><span style="font-size:11px;">Sign out</span></button>
       </div>
@@ -464,14 +465,27 @@ const saveTimers = {};
 function userDocRef(){ return db.collection('users').doc(currentUser.uid); }
 
 const store = {
-  set(key, val){
+  set(key, val, immediate){
     if(!currentUser) return;
     clearTimeout(saveTimers[key]);
-    saveTimers[key] = setTimeout(()=>{
-      userDocRef().set({ [key]: val }, { merge:true }).catch(e=>console.error('save failed', e));
-    }, 350);
+    const write = ()=>{
+      setSyncStatus('saving');
+      userDocRef().set({ [key]: val }, { merge:true })
+        .then(()=>setSyncStatus('saved'))
+        .catch(e=>{ console.error('save failed', e); setSyncStatus('error'); });
+    };
+    if(immediate){ write(); }
+    else { saveTimers[key] = setTimeout(write, 350); }
   }
 };
+
+function setSyncStatus(state){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  if(state==='saving'){ el.textContent = 'Saving…'; el.style.color = 'var(--muted)'; }
+  else if(state==='saved'){ el.textContent = 'Saved'; el.style.color = 'var(--yin)'; setTimeout(()=>{ if(el.textContent==='Saved') el.textContent=''; }, 1500); }
+  else if(state==='error'){ el.textContent = "Couldn't save — check connection"; el.style.color = 'var(--yang)'; }
+}
 
 function signIn(){
   const email = document.getElementById('authEmail').value.trim();
@@ -617,7 +631,7 @@ function addSkill(){
   const name = input.value.trim();
   if(!name) return;
   skills.push({name, level:20});
-  store.set('skills', skills);
+  store.set('skills', skills, true);
   input.value='';
   renderSkills();
 }
@@ -627,7 +641,7 @@ function updateSkillLevel(i, val){
   document.querySelectorAll('.skill-row .pct')[i].textContent = val+'%';
   updateDashboard();
 }
-function removeSkill(i){ skills.splice(i,1); store.set('skills', skills); renderSkills(); }
+function removeSkill(i){ skills.splice(i,1); store.set('skills', skills, true); renderSkills(); }
 
 // ---------- Certs ----------
 let certs = [];
@@ -655,12 +669,12 @@ function addCert(){
   const name = input.value.trim();
   if(!name) return;
   certs.push({name, status});
-  store.set('certs', certs);
+  store.set('certs', certs, true);
   input.value='';
   renderCerts();
 }
-function updateCertStatus(i, val){ certs[i].status = val; store.set('certs', certs); renderCerts(); }
-function removeCert(i){ certs.splice(i,1); store.set('certs', certs); renderCerts(); }
+function updateCertStatus(i, val){ certs[i].status = val; store.set('certs', certs, true); renderCerts(); }
+function removeCert(i){ certs.splice(i,1); store.set('certs', certs, true); renderCerts(); }
 
 // ---------- Update log ----------
 let updates = [];
@@ -685,12 +699,12 @@ function addUpdate(){
   const text = input.value.trim();
   if(!text) return;
   updates.push({text, done:false, date:new Date().toLocaleDateString()});
-  store.set('updates', updates);
+  store.set('updates', updates, true);
   input.value='';
   renderUpdates();
 }
-function toggleUpdate(i){ updates[i].done = !updates[i].done; store.set('updates', updates); renderUpdates(); }
-function removeUpdate(i){ updates.splice(i,1); store.set('updates', updates); renderUpdates(); }
+function toggleUpdate(i){ updates[i].done = !updates[i].done; store.set('updates', updates, true); renderUpdates(); }
+function removeUpdate(i){ updates.splice(i,1); store.set('updates', updates, true); renderUpdates(); }
 
 // ---------- Japan fund ----------
 let fund = {goal:null, current:null, monthly:null};
@@ -721,7 +735,7 @@ function saveFund(){
     current: document.getElementById('fundCurrent').value,
     monthly: document.getElementById('fundMonthly').value
   };
-  store.set('fund', fund);
+  store.set('fund', fund, true);
   renderFund();
 }
 
@@ -738,7 +752,7 @@ function renderJlpt(){
 }
 function saveJlpt(){
   jlpt = { current: document.getElementById('jlptCurrent').value, target: document.getElementById('jlptTarget').value };
-  store.set('jlpt', jlpt);
+  store.set('jlpt', jlpt, true);
   renderJlpt();
 }
 
@@ -756,11 +770,11 @@ function addStudyNote(){
   const text = input.value.trim();
   if(!text) return;
   studyLog.push({text, date:new Date().toLocaleDateString()});
-  store.set('studyLog', studyLog);
+  store.set('studyLog', studyLog, true);
   input.value='';
   renderStudyLog();
 }
-function removeStudyNote(i){ studyLog.splice(i,1); store.set('studyLog', studyLog); renderStudyLog(); }
+function removeStudyNote(i){ studyLog.splice(i,1); store.set('studyLog', studyLog, true); renderStudyLog(); }
 
 // ---------- Target jobs ----------
 let jobs = [];
@@ -787,21 +801,21 @@ function addJob(){
   const title = input.value.trim();
   if(!title) return;
   jobs.push({title, reqs:[]});
-  store.set('jobs', jobs);
+  store.set('jobs', jobs, true);
   input.value='';
   renderJobs();
 }
-function removeJob(i){ jobs.splice(i,1); store.set('jobs', jobs); renderJobs(); }
+function removeJob(i){ jobs.splice(i,1); store.set('jobs', jobs, true); renderJobs(); }
 function addReq(ji){
   const input = document.getElementById('reqInput'+ji);
   const text = input.value.trim();
   if(!text) return;
   jobs[ji].reqs.push({text, done:false});
-  store.set('jobs', jobs);
+  store.set('jobs', jobs, true);
   renderJobs();
 }
-function toggleReq(ji,ri){ jobs[ji].reqs[ri].done = !jobs[ji].reqs[ri].done; store.set('jobs', jobs); renderJobs(); }
-function removeReq(ji,ri){ jobs[ji].reqs.splice(ri,1); store.set('jobs', jobs); renderJobs(); }
+function toggleReq(ji,ri){ jobs[ji].reqs[ri].done = !jobs[ji].reqs[ri].done; store.set('jobs', jobs, true); renderJobs(); }
+function removeReq(ji,ri){ jobs[ji].reqs.splice(ri,1); store.set('jobs', jobs, true); renderJobs(); }
 
 // ---------- Career actions ----------
 let careerTasks = [];
@@ -820,12 +834,12 @@ function addCareerTask(){
   const text = input.value.trim();
   if(!text) return;
   careerTasks.push({text, done:false});
-  store.set('careerTasks', careerTasks);
+  store.set('careerTasks', careerTasks, true);
   input.value='';
   renderCareer();
 }
-function toggleCareer(i){ careerTasks[i].done = !careerTasks[i].done; store.set('careerTasks', careerTasks); renderCareer(); }
-function removeCareer(i){ careerTasks.splice(i,1); store.set('careerTasks', careerTasks); renderCareer(); }
+function toggleCareer(i){ careerTasks[i].done = !careerTasks[i].done; store.set('careerTasks', careerTasks, true); renderCareer(); }
+function removeCareer(i){ careerTasks.splice(i,1); store.set('careerTasks', careerTasks, true); renderCareer(); }
 
 // ---------- Dashboard aggregation ----------
 function updateDashboard(){
