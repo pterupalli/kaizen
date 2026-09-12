@@ -916,12 +916,55 @@ function renderNotes(){
   if(!notes.length){ grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No notes yet — click "+ New note" to jot something down.</div>'; return; }
   grid.innerHTML = notes.slice().reverse().map((n)=>{
     const i = notes.indexOf(n);
+    const collapsed = !!n.collapsed;
+    if(collapsed){
+      const preview = (n.body||'').slice(0,60);
+      return `<div class="note-card" style="min-height:auto;cursor:pointer;" onclick="toggleNoteCollapsed(${i})">
+        <div class="note-foot" style="margin-bottom:0;">
+          <span style="font-family:var(--serif);font-weight:600;font-size:13.5px;color:var(--ink);">${escapeHtml(n.title||'Untitled')}</span>
+          <button class="icon-btn" title="Expand" onclick="event.stopPropagation();toggleNoteCollapsed(${i})">⤢</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);">${escapeHtml(preview)}${(n.body||'').length>60?'…':''}</div>
+      </div>`;
+    }
     return `<div class="note-card">
-      <input class="note-title" value="${escapeHtml(n.title||'')}" placeholder="Title" oninput="updateNote(${i},'title',this.value)">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input class="note-title" value="${escapeHtml(n.title||'')}" placeholder="Title" oninput="updateNote(${i},'title',this.value)" style="flex:1;">
+        <button class="icon-btn" title="Minimize" onclick="toggleNoteCollapsed(${i})">⤡</button>
+        <button class="icon-btn" title="Open full editor" onclick="openNoteModal(${i})">⛶</button>
+      </div>
       <textarea class="note-body" placeholder="Write something..." oninput="updateNote(${i},'body',this.value)">${escapeHtml(n.body||'')}</textarea>
       <div class="note-foot"><span>${n.updated||n.date||''}</span><button class="icon-btn" onclick="removeNote(${i})">✕</button></div>
     </div>`;
   }).join('');
+}
+function toggleNoteCollapsed(i){
+  notes[i].collapsed = !notes[i].collapsed;
+  store.set('notes', notes, true);
+  renderNotes();
+}
+function openNoteModal(i){
+  const n = notes[i];
+  const host = document.getElementById('modal-host');
+  host.innerHTML = `<div class="modal-bg" id="modal-bg"><div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <input id="nm-title" value="${escapeHtml(n.title||'')}" placeholder="Title" style="border:none;background:none;font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink);flex:1;">
+      <button class="modal-close" id="nm-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <textarea id="nm-body" placeholder="Write something..." style="width:100%;min-height:340px;border:1px solid var(--glass-border);border-radius:10px;padding:12px;font-family:var(--sans);font-size:14px;resize:vertical;background:rgba(255,255,255,0.5);">${escapeHtml(n.body||'')}</textarea>
+    </div>
+    <div class="modal-foot">
+      <span style="font-size:11px;color:var(--muted);">✓ Saves automatically</span>
+      <div style="margin-left:auto"><button class="btn primary" id="nm-done">Done</button></div>
+    </div>
+  </div></div>`;
+  const close = () => { host.innerHTML=''; renderNotes(); };
+  document.getElementById('nm-close').onclick = close;
+  document.getElementById('nm-done').onclick = close;
+  document.getElementById('modal-bg').onclick = (e)=>{ if(e.target.id==='modal-bg') close(); };
+  document.getElementById('nm-title').addEventListener('input', e=>updateNote(i,'title',e.target.value));
+  document.getElementById('nm-body').addEventListener('input', e=>updateNote(i,'body',e.target.value));
 }
 function addNote(){
   notes.push({ title:'', body:'', date:new Date().toLocaleDateString(), updated:new Date().toLocaleDateString() });
