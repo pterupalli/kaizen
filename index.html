@@ -468,10 +468,11 @@ function userDocRef(){ return db.collection('users').doc(currentUser.uid); }
 const store = {
   set(key, val, immediate){
     if(!currentUser) return;
+    const snapshot = JSON.parse(JSON.stringify(val)); // freeze the value now, not a live reference
     clearTimeout(saveTimers[key]);
     const write = ()=>{
       setSyncStatus('saving');
-      userDocRef().set({ [key]: val }, { merge:true })
+      userDocRef().set({ [key]: snapshot }, { merge:true })
         .then(()=>setSyncStatus('saved'))
         .catch(e=>{ console.error('save failed', e); setSyncStatus('error'); });
     };
@@ -503,6 +504,7 @@ function signUp(){
 function signOutUser(){ auth.signOut(); }
 
 async function loadUserData(){
+  Object.keys(saveTimers).forEach(k => { clearTimeout(saveTimers[k]); delete saveTimers[k]; });
   const snap = await userDocRef().get();
   const data = snap.exists ? snap.data() : {};
   skills = data.skills || [];
@@ -589,7 +591,7 @@ async function sendChatMessage(){
     const res = await fetch(CHAT_ENDPOINT, {
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},
-      body: JSON.stringify({ message: text })
+      body: JSON.stringify({ message: text, history: chatHistory.slice(-8) })
     });
     const data = await res.json();
     typingEl.remove();
