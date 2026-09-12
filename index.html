@@ -542,7 +542,7 @@ auth.onAuthStateChanged(user=>{
 
 // ---------- Assistant chat ----------
 // Set this once the Cloud Function is deployed (Step 4 — see chat).
-const CHAT_ENDPOINT = '';
+const CHAT_ENDPOINT = 'https://kaizen-backend-zeta.vercel.app/api/chat';
 
 function addChatBubble(role, text){
   const log = document.getElementById('chatLog');
