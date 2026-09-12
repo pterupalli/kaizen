@@ -181,6 +181,24 @@
   .guide ul{margin:0 0 4px;padding-left:18px;}
   .guide li{margin-bottom:4px;}
 
+  .note-card{
+    background:rgba(255,255,255,0.55);border:1px solid var(--glass-border);border-radius:14px;
+    padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-height:130px;
+    transition:box-shadow .18s ease, transform .18s ease;
+  }
+  .note-card:hover{box-shadow:0 8px 22px rgba(35,41,70,0.08);transform:translateY(-1px);}
+  .note-card .note-title{
+    font-family:var(--serif);font-weight:600;font-size:14.5px;border:none;background:none;
+    color:var(--ink);padding:0;width:100%;
+  }
+  .note-card .note-title:focus{outline:none;}
+  .note-card textarea.note-body{
+    flex:1;border:none;background:none;resize:none;font-family:var(--sans);font-size:13px;
+    color:#3a3f4a;padding:0;min-height:70px;
+  }
+  .note-card textarea.note-body:focus{outline:none;}
+  .note-card .note-foot{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--muted);}
+
   .job-card{
     background:rgba(255,255,255,0.5);border:1px solid var(--glass-border);border-radius:14px;
     padding:14px 16px;margin-bottom:10px;transition:box-shadow .18s ease, transform .18s ease;
@@ -255,6 +273,7 @@
     <button data-view="itradar">IT radar</button>
     <button data-view="japan">Japan mission</button>
     <button data-view="career">Career ops</button>
+    <button data-view="notes">Notes</button>
   </nav>
 
   <!-- DASHBOARD -->
@@ -424,6 +443,17 @@
     </div>
   </section>
 
+  <!-- NOTES -->
+  <section id="notes" class="view">
+    <div class="panel">
+      <h2>Notes <span class="count" id="notesCountLabel"></span></h2>
+      <div class="row">
+        <button class="btn" onclick="addNote()">+ New note</button>
+      </div>
+      <div id="notesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;"></div>
+    </div>
+  </section>
+
   </div>
 
   <aside class="sidebar-chat">
@@ -513,11 +543,12 @@ async function loadUserData(){
   studyLog = data.studyLog || [];
   jobs = data.jobs || [];
   careerTasks = data.careerTasks || [];
+  notes = data.notes || [];
   suggestion = data.suggestion || null;
   chatHistory = data.chatHistory || [];
   document.getElementById('chatLog').innerHTML = '';
   chatHistory.forEach(m => addChatBubble(m.role, m.text));
-  renderSkills(); renderCerts(); renderUpdates(); renderFund(); renderJlpt(); renderStudyLog(); renderJobs(); renderCareer(); renderSuggestion();
+  renderSkills(); renderCerts(); renderUpdates(); renderFund(); renderJlpt(); renderStudyLog(); renderJobs(); renderCareer(); renderSuggestion(); renderNotes();
 }
 
 function renderSuggestion(){
@@ -855,6 +886,7 @@ function removeReq(ji,ri){ jobs[ji].reqs.splice(ri,1); store.set('jobs', jobs, t
 // ---------- Career actions ----------
 let careerTasks = [];
 let chatHistory = [];
+let notes = [];
 function renderCareer(){
   const wrap = document.getElementById('careerList');
   if(!careerTasks.length){ wrap.innerHTML = '<li class="empty">No actions listed yet.</li>'; return; }
@@ -876,6 +908,36 @@ function addCareerTask(){
 }
 function toggleCareer(i){ careerTasks[i].done = !careerTasks[i].done; store.set('careerTasks', careerTasks, true); renderCareer(); }
 function removeCareer(i){ careerTasks.splice(i,1); store.set('careerTasks', careerTasks, true); renderCareer(); }
+
+// ---------- Notes ----------
+function renderNotes(){
+  const grid = document.getElementById('notesGrid');
+  document.getElementById('notesCountLabel').textContent = notes.length ? `(${notes.length})` : '';
+  if(!notes.length){ grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No notes yet — click "+ New note" to jot something down.</div>'; return; }
+  grid.innerHTML = notes.slice().reverse().map((n)=>{
+    const i = notes.indexOf(n);
+    return `<div class="note-card">
+      <input class="note-title" value="${escapeHtml(n.title||'')}" placeholder="Title" oninput="updateNote(${i},'title',this.value)">
+      <textarea class="note-body" placeholder="Write something..." oninput="updateNote(${i},'body',this.value)">${escapeHtml(n.body||'')}</textarea>
+      <div class="note-foot"><span>${n.updated||n.date||''}</span><button class="icon-btn" onclick="removeNote(${i})">✕</button></div>
+    </div>`;
+  }).join('');
+}
+function addNote(){
+  notes.push({ title:'', body:'', date:new Date().toLocaleDateString(), updated:new Date().toLocaleDateString() });
+  store.set('notes', notes, true);
+  renderNotes();
+}
+function updateNote(i, field, value){
+  notes[i][field] = value;
+  notes[i].updated = new Date().toLocaleDateString();
+  store.set('notes', notes); // debounced — this fires on every keystroke
+}
+function removeNote(i){
+  notes.splice(i,1);
+  store.set('notes', notes, true);
+  renderNotes();
+}
 
 // ---------- Dashboard aggregation ----------
 function updateDashboard(){
