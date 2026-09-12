@@ -211,6 +211,27 @@
 
   footer{text-align:center;color:var(--muted);font-size:11.5px;margin-top:30px;}
 
+  /* Modal */
+  .modal-bg{
+    position:fixed;inset:0;background:rgba(34,38,47,0.35);
+    display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;
+  }
+  .modal{
+    background:var(--glass-strong);backdrop-filter:blur(20px) saturate(140%);-webkit-backdrop-filter:blur(20px) saturate(140%);
+    border:1px solid var(--glass-border);border-radius:18px;width:100%;max-width:560px;
+    max-height:calc(100vh - 40px);overflow-y:auto;box-shadow:0 20px 60px rgba(35,41,70,0.25);
+  }
+  .modal-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--line);}
+  .modal-close{
+    margin-left:auto;background:none;border:none;font-size:16px;color:var(--muted);
+    cursor:pointer;padding:4px 8px;border-radius:6px;
+  }
+  .modal-close:hover{background:rgba(255,255,255,0.4);color:var(--ink);}
+  .modal-body{padding:18px 20px;}
+  .modal-foot{
+    padding:12px 20px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;
+  }
+
   /* thin scrollbars for glass panels */
   #chatLog::-webkit-scrollbar, .frame ::-webkit-scrollbar{width:6px;}
   #chatLog::-webkit-scrollbar-thumb, .frame ::-webkit-scrollbar-thumb{background:rgba(35,41,70,0.2);border-radius:6px;}
@@ -471,6 +492,7 @@
   </div>
 
   <footer>Signed in and synced to your account</footer>
+  <div id="modal-host"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
