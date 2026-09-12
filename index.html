@@ -66,16 +66,17 @@
     border-radius:9px;white-space:nowrap;transition:background .15s ease,color .15s ease;
   }
   nav.tabs button.active{color:#fff;background:linear-gradient(120deg,var(--yin),var(--yang));}
+  #suggestionBadge{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--yang);margin-left:4px;vertical-align:middle;box-shadow:0 0 0 2px rgba(217,138,69,0.25);}
   nav.tabs button:not(.active):hover{color:var(--ink);background:rgba(255,255,255,0.5);}
 
   .view{display:none;}
   .view.active{display:block;}
 
-  .layout{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
+  .layout{display:grid;grid-template-columns:1fr 420px;gap:20px;align-items:start;}
   .main-col{min-width:0;}
   .sidebar-chat{position:sticky;top:20px;height:80vh;min-width:0;}
   .sidebar-chat .panel{height:100%;margin-bottom:0;overflow:hidden;padding-bottom:22px;}
-  @media (max-width:900px){
+  @media (max-width:1000px){
     .layout{grid-template-columns:1fr;}
     .sidebar-chat{position:static;height:480px;}
   }
@@ -252,7 +253,7 @@
   <div class="main-col">
 
   <nav class="tabs">
-    <button data-view="dashboard" class="active">Dashboard</button>
+    <button data-view="dashboard" class="active">Dashboard <span id="suggestionBadge" style="display:none;"></span></button>
     <button data-view="itradar">IT radar</button>
     <button data-view="japan">Japan mission</button>
     <button data-view="career">Career ops</button>
@@ -283,7 +284,7 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" onmouseenter="markSuggestionSeen()">
       <h2>Today's suggestion</h2>
       <div class="guide" id="suggestionBox">
         <p style="color:var(--muted);font-style:italic;">No suggestion generated yet — this fills in once the daily AI check-in is wired up.</p>
@@ -513,16 +514,30 @@ async function loadUserData(){
   jobs = data.jobs || [];
   careerTasks = data.careerTasks || [];
   suggestion = data.suggestion || null;
+  chatHistory = data.chatHistory || [];
+  document.getElementById('chatLog').innerHTML = '';
+  chatHistory.forEach(m => addChatBubble(m.role, m.text));
   renderSkills(); renderCerts(); renderUpdates(); renderFund(); renderJlpt(); renderStudyLog(); renderJobs(); renderCareer(); renderSuggestion();
 }
 
 function renderSuggestion(){
   const box = document.getElementById('suggestionBox');
+  const badge = document.getElementById('suggestionBadge');
   if(!suggestion || !suggestion.text){
-    box.innerHTML = '<p style="color:var(--muted);font-style:italic;">No suggestion generated yet — this fills in once the daily AI check-in is wired up.</p>';
+    box.innerHTML = '<p style="color:var(--muted);font-style:italic;">No suggestion generated yet — this fills in once the daily check-in runs.</p>';
+    badge.style.display = 'none';
     return;
   }
   box.innerHTML = `<p style="color:var(--muted);font-size:12px;margin-bottom:6px;">${escapeHtml(suggestion.date||'')}</p><p>${escapeHtml(suggestion.text)}</p>`;
+  badge.style.display = suggestion.seen ? 'none' : 'inline-block';
+}
+
+function markSuggestionSeen(){
+  if(suggestion && !suggestion.seen){
+    suggestion = { ...suggestion, seen: true };
+    store.set('suggestion', suggestion, true);
+    document.getElementById('suggestionBadge').style.display = 'none';
+  }
 }
 
 auth.onAuthStateChanged(user=>{
@@ -560,12 +575,15 @@ async function sendChatMessage(){
   const text = input.value.trim();
   if(!text) return;
   addChatBubble('user', text);
+  chatHistory.push({role:'user', text});
   input.value = '';
 
   if(!CHAT_ENDPOINT){
     addChatBubble('assistant', "I'm not connected to my backend yet — once the Cloud Function is deployed I'll be able to update your trackers and answer questions directly from here.");
     return;
   }
+
+  const typingEl = showTyping();
   try{
     const idToken = await currentUser.getIdToken();
     const res = await fetch(CHAT_ENDPOINT, {
@@ -574,11 +592,27 @@ async function sendChatMessage(){
       body: JSON.stringify({ message: text })
     });
     const data = await res.json();
-    addChatBubble('assistant', data.reply || "Got it.");
+    typingEl.remove();
+    const reply = data.reply || "Got it.";
+    addChatBubble('assistant', reply);
+    chatHistory.push({role:'assistant', text:reply});
+    if(chatHistory.length > 60) chatHistory = chatHistory.slice(-60);
+    store.set('chatHistory', chatHistory, true);
     if(data.updated) loadUserData();
   }catch(e){
+    typingEl.remove();
     addChatBubble('assistant', "Couldn't reach the assistant just now — try again in a moment.");
   }
+}
+
+function showTyping(){
+  const log = document.getElementById('chatLog');
+  const el = document.createElement('div');
+  el.style.cssText = 'align-self:flex-start;background:rgba(255,255,255,0.6);border:1px solid var(--glass-border);padding:10px 14px;border-radius:14px 14px 14px 2px;font-size:14px;color:var(--muted);';
+  el.textContent = 'April is thinking…';
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
 }
 
 // ---------- Tabs ----------
@@ -588,6 +622,7 @@ document.querySelectorAll('nav.tabs button').forEach(btn=>{
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById(btn.dataset.view).classList.add('active');
+    if(btn.dataset.view === 'dashboard') markSuggestionSeen();
   });
 });
 
@@ -602,7 +637,7 @@ tickClock(); setInterval(tickClock,1000);
 // ---------- Fit April's panel to the visible screen ----------
 function sizeSidebar(){
   const aside = document.querySelector('.sidebar-chat');
-  if(!aside || window.innerWidth <= 900) { if(aside) aside.style.height=''; return; }
+  if(!aside || window.innerWidth <= 1000) { if(aside) aside.style.height=''; return; }
   const top = aside.getBoundingClientRect().top;
   const available = window.innerHeight - top - 20;
   aside.style.height = Math.max(320, available) + 'px';
@@ -819,6 +854,7 @@ function removeReq(ji,ri){ jobs[ji].reqs.splice(ri,1); store.set('jobs', jobs, t
 
 // ---------- Career actions ----------
 let careerTasks = [];
+let chatHistory = [];
 function renderCareer(){
   const wrap = document.getElementById('careerList');
   if(!careerTasks.length){ wrap.innerHTML = '<li class="empty">No actions listed yet.</li>'; return; }
